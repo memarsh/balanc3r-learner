@@ -1,5 +1,7 @@
 # balanc3r-learner
-A Lego robot that uses reinforcement learning to balance itself
+A Lego Mindstorms EV3 robot that uses reinforcement learning to balance itself
+
+Uses the ev3dev OS
 
 Trouble-shooting tips:
 - disconnect sensors before turning on robot
