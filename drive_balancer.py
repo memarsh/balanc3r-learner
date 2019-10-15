@@ -13,12 +13,8 @@ logging.basicConfig(level=logging.DEBUG,
 log = logging.getLogger(__name__)
 log.info("Starting Balanc3rLearner")
 
-# Infrared remote
-remote = InfraredSensor()
-remote.mode = remote.MODE_IR_REMOTE
-
 # Balance robot
-robot = BalancerLearner()
+robot = BalancerLearner(debug=True)
 robot.balance()
 
 try:

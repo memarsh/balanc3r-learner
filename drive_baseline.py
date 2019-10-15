@@ -12,10 +12,6 @@ logging.basicConfig(level=logging.DEBUG,
 log = logging.getLogger(__name__)
 log.info("Starting Balanc3rBaseline")
 
-# Infrared remote
-remote = InfraredSensor()
-remote.mode = remote.MODE_IR_REMOTE
-
 # Balance robot
 robot = GyroBalancer()
 robot.balance()

@@ -120,7 +120,8 @@ class BalancerLearner(object):
 
         # Gyro Sensor setup
         self.gyro = GyroSensor()
-        self.gyro.mode = self.gyro.MODE_GYRO_RATE
+        #self.gyro.mode = self.gyro.MODE_GYRO_RATE
+        self.gyro.mode = self.gyro.MODE_GYRO_G_A
 
         # Touch Sensor setup
         self.touch = TouchSensor()
@@ -137,7 +138,8 @@ class BalancerLearner(object):
         self.sound = Sound()
 
         # Open sensor and motor files
-        self.gyro_file = open(self.gyro._path + "/value0", "rb")
+        self.gyro_angle_file = open(self.gyro._path + "/value0", "rb")
+        self.gyro_rate_file = open(self.gyro._path + "/value1", "rb")
         self.touch_file = open(self.touch._path + "/value0", "rb")
         self.encoder_left_file = open(self.motor_left._path + "/position",
                                       "rb")
@@ -146,11 +148,6 @@ class BalancerLearner(object):
         self.dc_left_file = open(self.motor_left._path + "/duty_cycle_sp", "w")
         self.dc_right_file = open(self.motor_right._path + "/duty_cycle_sp",
                                   "w")
-
-        # My files for data analysis
-        self.gyro_data_file = open("gyro_data.txt", "a")
-        self.dc_left_data_file = open("dc_left_data.txt", "a")
-        self.dc_right_data_file = open("dc_right_data.txt", "a")
 
         # Drive queue
         self.drive_queue = queue.Queue()
@@ -170,16 +167,13 @@ class BalancerLearner(object):
         self.stop_balance.set()  # Stop balance thread
         self.motor_left.stop()
         self.motor_right.stop()
-        self.gyro_file.close()
+        self.gyro_angle_file.close()
+        self.gyro_rate_file.close()
         self.touch_file.close()
         self.encoder_left_file.close()
         self.encoder_right_file.close()
         self.dc_left_file.close()
         self.dc_right_file.close()
-
-        self.gyro_data_file.close()
-        self.dc_left_data_file.close()
-        self.dc_right_data_file.close()
 
     def _fast_read(self, infile):
         """Function for fast reading from sensor files."""
@@ -336,9 +330,13 @@ class BalancerLearner(object):
             # value of 100 samples
             gyro_calibrate_count = 100
             for i in range(gyro_calibrate_count):
-                log.info(self._fast_read(self.gyro_file))
-                gyro_offset = gyro_offset + self._fast_read(self.gyro_file)
+                gyro_data = self._fast_read(self.gyro_rate_file)
+                #log.info(gyro_data)
+                #gyro_other_data = self._fast_read(self.gyro_other)
+                #log.info(gyro_other_data)
+                gyro_offset = gyro_offset + gyro_data
                 #self.gyro_data_file.write(str(gyro_data), "\n")
+                #self.gyro_data_file.flush()
                 time.sleep(0.01)
             gyro_offset = gyro_offset / gyro_calibrate_count
             #gyro_offset = 0
@@ -360,8 +358,23 @@ class BalancerLearner(object):
                 data = OrderedDict()
                 loop_times = OrderedDict()
                 data['loop_times'] = loop_times
-                gyro_readings = OrderedDict()
-                data['gyro_readings'] = gyro_readings
+                gyro_angles = OrderedDict()
+                data['gyro_angles'] = gyro_angles
+                gyro_rates_raw = OrderedDict()
+                data['gyro_rates_raw'] = gyro_rates_raw
+                gyro_est_angles = OrderedDict()
+                data['gyro_est_angles'] = gyro_est_angles
+                gyro_rates = OrderedDict()
+                data['gyro_rates'] = gyro_rates
+                motor_angle_errors = OrderedDict()
+                data['motor_angle_errors'] = motor_angle_errors
+                motor_angular_speed_errors = OrderedDict()
+                data['motor_angular_speed_errors'] = motor_angular_speed_errors
+                motor_angle_errors_acc = OrderedDict()
+                data['motor_angle_errors_acc'] = motor_angle_errors_acc
+                motor_duty_cycles = OrderedDict()
+                data['motor_duty_cycles'] = motor_duty_cycles
+
 
             # Initial fast read touch sensor value
             touch_pressed = False
@@ -394,7 +407,8 @@ class BalancerLearner(object):
                 motor_angle = motor_angle_raw * RAD_PER_RAW_MOTOR_UNIT
 
                 # Read the Gyro
-                gyro_rate_raw = self._fast_read(self.gyro_file)
+                gyro_rate_raw = self._fast_read(self.gyro_rate_file)
+                #log.info(gyro_rate_raw)
 
                 # Busy wait for the loop to reach target time length
                 loop_time = 0
@@ -408,11 +422,12 @@ class BalancerLearner(object):
                 # Set start time of next loop
                 loop_start_time = time.time()
 
-                if self.debug:
+                #if self.debug:
                     # Log gyro data and loop time
-                    time_of_sample = time.time() - prog_start_time
-                    gyro_readings[time_of_sample] = gyro_rate_raw
-                    loop_times[time_of_sample] = loop_time * 1000.0
+                    #time_of_sample = time.time() - prog_start_time
+                    #gyro_angles[time_of_sample] = self._fast_read(self.gyro_angle_file)
+                    #gyro_rates[time_of_sample] = gyro_rate_raw
+                    #loop_times[time_of_sample] = loop_time * 1000.0
 
                 # Calculate gyro rate
                 gyro_rate = (gyro_rate_raw - gyro_offset) *\
@@ -457,6 +472,19 @@ class BalancerLearner(object):
                 # Update Accumulated Motor Error
                 motor_angle_error_acc = motor_angle_error_acc +\
                     motor_angle_error * loop_time_target
+
+                if self.debug:
+                    # Log gyro data and loop time
+                    time_of_sample = time.time() - prog_start_time
+                    gyro_angles[time_of_sample] = self._fast_read(self.gyro_angle_file)
+                    gyro_rates_raw[time_of_sample] = gyro_rate_raw
+                    loop_times[time_of_sample] = loop_time * 1000.0
+                    motor_duty_cycles[time_of_sample] = motor_duty_cycle
+                    gyro_est_angles[time_of_sample] = gyro_est_angle
+                    gyro_rates[time_of_sample] = gyro_rate
+                    motor_angle_errors[time_of_sample] = motor_angle_error
+                    motor_angular_speed_errors[time_of_sample] = motor_angular_speed_error
+                    motor_angle_errors_acc[time_of_sample] = motor_angle_error_acc
 
             # Closing down & Cleaning up
 
